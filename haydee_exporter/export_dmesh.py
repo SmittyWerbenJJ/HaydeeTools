@@ -122,7 +122,7 @@ def func_export_vertices(file_format:str,dmesh:DMesh):
     if len(dmesh.mesh.uv_layers) >= 1:
         for uv in dmesh.new_mesh_uvs:
             uv_coord = Vector(uv)
-            if (file_format == 'H1'):
+            if (file_format == 'H2'):
                 uv_coord = Vector((uv_coord.x, 1-uv_coord.y))
             dmesh.uvs_output.append("\t\tuv %s %s;\n" % (d(uv_coord.x), d(uv_coord.y)))
 

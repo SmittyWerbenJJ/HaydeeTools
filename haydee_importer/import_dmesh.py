@@ -412,7 +412,7 @@ class ImportHaydeeDMesh(Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        for filepath in self.files:
-            read_dmesh(self, context, os.path.join(self.directory, filepath),
+        for file in self.files:
+            read_dmesh(self, context, os.path.join(self.directory, file.name),
                        self.file_format)
         return {"FINISHED"}

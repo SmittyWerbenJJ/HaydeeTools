@@ -6,8 +6,21 @@ import os
 import zipfile
 from pathlib import Path
 import shutil
+from pathspec import GitIgnoreSpec
+import argparse
+import zipfile
+import re
 
 BLENDER_VERSION_STR="3.3"
+DEPLOYEMENT_IGNORED_PATTERNS = [
+        ".git",
+        ".vscode",
+        ".gitignore",
+        "setup.cfg",
+        "scripts",
+        "requirements.txt"
+        
+    ]
 
 def match_path(path, patterns):
     """ match a pattern """
@@ -49,63 +62,90 @@ def clear_build_folder(project_dir:str):
 
     build_dir.mkdir(parents=True,exist_ok=True)
 
-def make_archive(project_dir:str,ignored_patterns:list,):
-    """ make archive """
-    project_name=Path(project_dir).name
-    final_zip_path = Path(project_dir).joinpath("build").joinpath(
-        project_name + ".zip")
+def make_archive(
+    project_dir: Path,
+    ignored_patterns: list[str],
+):
+    """make archive"""
+    print("Packaging the addon ...")
+    project_name = project_dir.name
+    final_zip_path = project_dir.joinpath("build").joinpath(project_name + ".zip")
 
-    #make archive
+    # make archive
     with zipfile.ZipFile(str(final_zip_path), "w") as zfile:
-        for file in project_dir.rglob("*"):
-            relative_path=file.relative_to(project_dir)
-
-            #skip gitignore patterns
-            if match_path(relative_path,ignored_patterns):
-                continue
-
+        spec = GitIgnoreSpec.from_lines(ignored_patterns)
+        
+        filelist=list(map(project_dir.joinpath, spec.match_tree_files(project_dir,negate=True)))
+        for i, file in enumerate(filelist):
+            relative_path = file.relative_to(project_dir)
             if file.is_file():
-                print(f"Adding {relative_path} ...")
-                zfile.write(str(file), arcname=project_name+"/"+str(relative_path))
-
-print("Project has been packaged.")
-
-def copy_to_blender_addons(project_dir:str,blender_version=BLENDER_VERSION_STR):
-    """ copy to blender addons folder """
-    print("Copying to blender addons folder...")
-    project_name=Path(project_dir).name
-    blender_addons_folder=Path(os.getenv('APPDATA')).joinpath(rf"Blender Foundation\Blender\{blender_version}\scripts\addons")
+                print(f"{i+1:3}/{len(filelist)}\t{relative_path}")
+                zfile.write(str(file), arcname=project_name + "/" + str(relative_path))
 
 
-    final_zip_path = Path(project_dir).joinpath("build").joinpath(
-        project_name + ".zip")
-    #clear project-addon in addons folder
-    dst_folder=blender_addons_folder.joinpath(project_name)
+
+
+def deploy_addon(deploy_dir:Path,project_dir: Path, blender_version=BLENDER_VERSION_STR):
+    """copy to blender addons folder"""
+    print(f"Deploying to \"{deploy_dir}\"")
+    project_name = Path(project_dir).name
+    # blender_addons_folder = Path(os.getenv("APPDATA")).joinpath(
+    #     rf"Blender Foundation\Blender\{blender_version}\scripts\addons"
+    # )
+    final_zip_path = Path(project_dir).joinpath("build").joinpath(project_name + ".zip")
+    dst_folder = deploy_dir.joinpath(project_name)
+
     if dst_folder.exists():
-        items_in_dst_folder=list(dst_folder.glob("*"))
+        try:
+            shutil.rmtree(dst_folder)
+        except Exception as e:
+            print(f"{e}\n\n--------------------\nFailed to clear addon folder:")
+            return
 
-        print(f"Clearing Addon in Blender {blender_version} addons ...")
-        if len(items_in_dst_folder)>0:
-            for item in items_in_dst_folder:
-                if item.is_file():
-                    item.unlink()
-                else:
-                    shutil.rmtree(item)
-
-    print("Creating Addon in Blender addons ...")
-    dst_folder.mkdir(parents=True,exist_ok=True)
-    zipfile.ZipFile(final_zip_path).extractall(blender_addons_folder)
+    dst_folder.mkdir(parents=True, exist_ok=True)
+    zipfile.ZipFile(final_zip_path).extractall(deploy_dir)
 
 
 def build():
     # project dir,assuming this script is located in Project/scripts/
-    project_dir=Path(__file__).parent.parent
-    ignored_patterns=[".git", ".vscode", "build", "build.py", "__pycache__"]
-    ignored_patterns+=get_gitignore_entries(project_dir)
+    parser = argparse.ArgumentParser(description="Build the current project as a addon")
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        default=False,
+        help="Clean the build folder before building",
+    )
+    parser.add_argument("--deploy",type=Path,metavar="dir",   help="Copy the addon to blender addons folder,Requires version argument")
+    
+    parser.add_argument(
+        "--version",
+        type=str,
+        default=BLENDER_VERSION_STR,
+        help="Blender version to deploy the addon, e.g. 3.6",
+    )
+    args = parser.parse_args()
 
-    clear_build_folder(project_dir)
-    make_archive(project_dir,ignored_patterns)
-    copy_to_blender_addons(project_dir)
+    # assuming we are in Project/scripts/
+    project_dir = Path(__file__).parent.parent
+
+    deployement_ignored_patterns=DEPLOYEMENT_IGNORED_PATTERNS
+    deployement_ignored_patterns += get_gitignore_entries(project_dir)
+    
+    if args.clean:
+        clear_build_folder(project_dir)
+
+    make_archive(project_dir, deployement_ignored_patterns)
+    
+
+    if args.deploy is not None:
+        if not args.version:
+            print("Please specify the blender version to deploy the addon, e.g. --version 3.6")
+            return
+        if not re.match(r"^\d+\.\d+$", args.version):
+            print(f"Possibly wrong blender version format {args.version}\nAre you sure you want to continue? (y/n): ", end="")
+            if input().lower() not in ["y", "yes"]:
+                return
+        deploy_addon(args.deploy,project_dir, args.version,)
 
     print("Done.")
 

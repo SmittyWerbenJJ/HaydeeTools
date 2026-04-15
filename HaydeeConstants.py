@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import Enum,IntEnum
 from mathutils import Matrix
 
 
 # Global enum for asset type
-class Signature(Enum):
+class Signature(IntEnum):
     HD_CHUNK = 0
     HD_DATA_TXT = 1
     HD_DATA_TXT_BOM = 2

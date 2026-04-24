@@ -1,4 +1,4 @@
-from math import pi
+import math
 import os
 import bpy
 from bpy.types import Operator
@@ -237,6 +237,10 @@ def read_dmesh(operator, context, filepath, file_format):
 
             if armature_ob:
                 armature_ob.select_set(state=True)
+                #if bpy.app.version>(4,0,0):
+                #    rotation_matrix=Matrix.Rotation(math.radians(180),4,"Y")
+                #    armature_ob.matrix_world = rotation_matrix @ armature_ob.matrix_world
+                #    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
 
             # Create mesh (verts and faces)
             progress.enter_substeps(len(meshFaces), "creating meshes")
@@ -267,10 +271,7 @@ def read_dmesh(operator, context, filepath, file_format):
                 mesh_data.from_pydata(list(map(coordTransform, objVerts)), [],
                                       objFaces)
                 # Shade smooth
-                mesh_data.use_auto_smooth = True
-                mesh_data.auto_smooth_angle = pi
-                mesh_data.polygons.foreach_set("use_smooth", [True] *
-                                               len(mesh_data.polygons))
+                mesh_data.shade_smooth()
                 progress.leave_substeps("mesh data end")
 
                 # apply UVs
@@ -337,10 +338,14 @@ def read_dmesh(operator, context, filepath, file_format):
                     # Mark sharp edges
                     progress.enter_substeps(1, "mark sharp")
                     if unique_smooth_groups and sharp_edges:
-                        for e in mesh_data.edges:
-                            if e.key in sharp_edges:
-                                e.use_edge_sharp = True
-                        # mesh_data.show_edge_sharp = True
+                        sharp_edge_attr = mesh_data.attributes.get("sharp_edge")
+                        if sharp_edge_attr is None:
+                            sharp_edge_attr = mesh_data.attributes.new(name="sharp_edge", type="BOOLEAN", domain="EDGE")
+                        edge_vals = sharp_edge_attr.data
+                        edge_keys = {e.key: i for i, e in enumerate(mesh_data.edges)}
+                        for key in sharp_edges:
+                            if key in edge_keys:
+                                edge_vals[edge_keys[key]].value = True
                     progress.leave_substeps("mark sharp end")
 
                 progress.enter_substeps(1, "linking")

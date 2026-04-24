@@ -98,10 +98,7 @@ def read_mesh(operator, context, filepath, outfitName, file_format):
             mesh_data = bpy.data.meshes.new(DEFAULT_MESH_NAME)
             mesh_data.from_pydata(vert_data, [], face_data)
             # Shade smooth
-            mesh_data.use_auto_smooth = True
-            mesh_data.auto_smooth_angle = pi
-            mesh_data.polygons.foreach_set("use_smooth",
-                                           [True] * len(mesh_data.polygons))
+            mesh_data.shade_smooth()
             progress.leave_substeps("mesh data end")
 
             # apply UVs
@@ -119,12 +116,17 @@ def read_mesh(operator, context, filepath, outfitName, file_format):
 
             # normals
             use_edges = True
-            mesh_data.create_normals_split()
-            meshCorrected = mesh_data.validate(
-                clean_customdata=False)  # *Very* important to not remove nors!
+            mesh_data.validate(clean_customdata=False)
             mesh_data.update(calc_edges=use_edges)
-            mesh_data.normals_split_custom_set_from_vertices(normals)
-            mesh_data.use_auto_smooth = True
+            if normals:
+                if len(normals) == len(mesh_data.vertices):
+                    # Per-vertex → expand to per-loop
+                    loop_normals = [normals[loop.vertex_index] for loop in mesh_data.loops]
+                else:
+                    # Already per-loop
+                    loop_normals = normals
+                
+                mesh_data.normals_split_custom_set(loop_normals)
 
             mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
             linkToActiveCollection(mesh_obj)

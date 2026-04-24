@@ -13,7 +13,7 @@ NODE_FRAME = 'NodeFrame'
 # Nodes Shaders
 BSDF_DIFFUSE_NODE = 'ShaderNodeBsdfDiffuse'
 BSDF_EMISSION_NODE = 'ShaderNodeEmission'
-BSDF_GLOSSY_NODE = 'ShaderNodeBsdfGlossy'
+BSDF_GLOSSY_NODE = 'ShaderNodeBsdfAnisotropic'
 PRINCIPLED_SHADER_NODE = 'ShaderNodeBsdfPrincipled'
 BSDF_TRANSPARENT_NODE = 'ShaderNodeBsdfTransparent'
 SHADER_ADD_NODE = 'ShaderNodeAddShader'
@@ -92,7 +92,7 @@ def create_material(obj, useAlpha, mat_name, diffuseFile, normalFile, specularFi
     create_cycle_node_material(material, useAlpha, diffuseFile, normalFile, specularFile, emissionFile)
 
 
-def create_cycle_node_material(material, useAlpha, diffuseFile, normalFile, specularFile, emissionFile):
+def create_cycle_node_material(material:bpy.types.Material, useAlpha, diffuseFile, normalFile, specularFile, emissionFile):
     # Nodes
     node_tree = material.node_tree
     node_tree.nodes.clear()
@@ -173,7 +173,7 @@ def create_cycle_node_material(material, useAlpha, diffuseFile, normalFile, spec
     pbrShaderNode.location = diffuseTextureNode.location + Vector((col_width * 4, -100))
     pbrColorInput = 'Base Color'
     pbrRoughnessInput = 'Roughness'
-    pbrReflectionInput = 'Specular'
+    pbrReflectionInput = 'Specular IOR Level'
     pbrMetallicInput = 'Metallic'
 
     emissionNode = node_tree.nodes.new(BSDF_EMISSION_NODE)
@@ -306,11 +306,11 @@ def haydee_normal_map():
     group_outputs.location = combineRgbNode.location + Vector((200, 0))
 
     # group_inputs.inputs.new(NODE_SOCKET_SHADER,'Shader')
-    input_color = node_tree.inputs.new(NODE_SOCKET_COLOR, 'Color')
+    input_color = node_tree.interface.new_socket(socket_type=NODE_SOCKET_COLOR,name='Color')
     input_color.default_value = (.5, .5, .5, 1)
-    input_alpha = node_tree.inputs.new(NODE_SOCKET_COLOR, 'Alpha')
+    input_alpha = node_tree.interface.new_socket(socket_type=NODE_SOCKET_COLOR,name='Alpha')
     input_alpha.default_value = (.5, .5, .5, 1)
-    output_value = node_tree.outputs.new(NODE_SOCKET_COLOR, 'Normal')
+    output_value = node_tree.interface.new_socket(socket_type=NODE_SOCKET_COLOR,name= 'Normal',in_out="OUTPUT")
 
     # Links Input
     links = node_tree.links
